@@ -1,0 +1,1075 @@
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[margin=2cm]{geometry}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{xeCJK}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{tabularx}
+
+\setCJKmainfont{SimSun}
+
+\lstset{
+basicstyle=\ttfamily\small,
+breaklines=true,
+columns=fullflexible,
+frame=single,
+backgroundcolor=\color{gray!10},
+keywordstyle=\color{blue},
+commentstyle=\color{green!60!black},
+stringstyle=\color{red}
+}
+
+\pagestyle{fancy}
+\lhead{房屋管理系統 API 規範}
+\rhead{第 \thepage\ 頁，共 \pageref{LastPage}\ 頁}
+\cfoot{\small 更新時間：2026-01-06}
+
+\title{\textbf{房屋管理系統 API 規範文件}}
+\author{API 文件版本 2.3}
+\date{2026年1月6日}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\newpage
+
+\section{簡介}
+
+本文件詳細說明房屋管理系統的核心 API 端點，涵蓋完整的三層權限架構。
+
+\subsection{版本歷史}
+
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\textbf{版本} & \textbf{日期} & \textbf{更新內容} \\
+\hline
+1.0 & 2025-12-31 & 初始版本：資料查詢、CRUD 操作、照片上傳 \\
+\hline
+2.0 & 2025-12-31 & 新增 Google OAuth 登入 API、JWT 認證系統 \\
+\hline
+2.1 & 2026-01-01 & 新增使用者管理 API（CRUD） \\
+\hline
+2.2 & 2026-01-01 & 重新設計三層權限架構（user, manager, admin） \\
+\hline
+2.3 & 2026-01-06 & 更新實際 API 路徑，補充完整 INPUT 規格 \\
+\hline
+\end{tabularx}
+
+\subsection{技術架構}
+
+\begin{itemize}
+\item \textbf{後端框架}：n8n Workflow Automation
+\item \textbf{資料庫}：Supabase PostgreSQL
+\item \textbf{認證方式}：Google OAuth 2.0 + JWT Token
+\item \textbf{權限系統}：三層角色權限（user, manager, admin）
+\item \textbf{檔案儲存}：Supabase Storage
+\item \textbf{API 基礎網址}：https://findmyhome.zeabur.app/webhook
+\item \textbf{測試環境}：https://findmyhome.zeabur.app/webhook-test
+\end{itemize}
+
+\newpage
+
+\section{權限系統說明}
+
+\subsection{三層角色定義}
+
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\textbf{角色} & \textbf{英文代碼} & \textbf{權限說明} \\
+\hline
+一般使用者 & user & 僅能查看公開資料、修改自己的個人資料 \\
+\hline
+管理者 & manager & 可管理房屋物件、社區資料，可查看使用者列表 \\
+\hline
+系統管理員 & admin & 完整權限，可管理所有功能包括使用者帳號 \\
+\hline
+\end{tabularx}
+
+\subsection{完整權限矩陣}
+
+\begin{tabularx}{\textwidth}{|l|c|c|c|X|}
+\hline
+\textbf{功能} & \textbf{User} & \textbf{Manager} & \textbf{Admin} & \textbf{說明} \\
+\hline
+\multicolumn{5}{|l|}{\textbf{公開資料}} \\
+\hline
+查看所有物件 & ✓ & ✓ & ✓ & 所有人可查看 \\
+\hline
+查看所有社區 & ✓ & ✓ & ✓ & 所有人可查看 \\
+\hline
+查看使用者列表（基本資訊） & ✓ & ✓ & ✓ & 所有人可查看 \\
+\hline
+\multicolumn{5}{|l|}{\textbf{個人資料}} \\
+\hline
+查看自己的完整資料 & ✓ & ✓ & ✓ & 可查看自己 \\
+\hline
+修改自己的個人資料 & ✓ & ✓ & ✓ & 可修改自己 \\
+\hline
+\multicolumn{5}{|l|}{\textbf{房屋物件管理}} \\
+\hline
+新增物件 & ✗ & ✓ & ✓ & Manager 以上 \\
+\hline
+修改物件 & ✗ & ✓ & ✓ & Manager 以上 \\
+\hline
+刪除物件 & ✗ & ✓ & ✓ & Manager 以上 \\
+\hline
+上傳物件照片 & ✗ & ✓ & ✓ & Manager 以上 \\
+\hline
+\multicolumn{5}{|l|}{\textbf{社區管理}} \\
+\hline
+新增社區 & ✗ & ✓ & ✓ & Manager 以上 \\
+\hline
+修改社區 & ✗ & ✓ & ✓ & Manager 以上 \\
+\hline
+刪除社區 & ✗ & ✓ & ✓ & Manager 以上 \\
+\hline
+\multicolumn{5}{|l|}{\textbf{使用者管理}} \\
+\hline
+查看所有使用者（完整資訊） & ✗ & ✗ & ✓ & 僅 Admin \\
+\hline
+新增使用者 & ✗ & ✗ & ✓ & 僅 Admin \\
+\hline
+修改他人資料 & ✗ & ✗ & ✓ & 僅 Admin \\
+\hline
+更新使用者角色 & ✗ & ✗ & ✓ & 僅 Admin \\
+\hline
+刪除使用者 & ✗ & ✗ & ✓ & 僅 Admin \\
+\hline
+\end{tabularx}
+
+\newpage
+
+\section{API 1：使用者管理}
+
+\subsection{基本資訊}
+
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{項目} & \textbf{說明} \\
+\hline
+功能說明 & 管理使用者資料與角色（新增、修改、刪除） \\
+\hline
+請求方法 & POST \\
+\hline
+API 路徑 & /webhook/admin/users \\
+\hline
+需要認證 & 是（僅 admin 可執行） \\
+\hline
+權限要求 & admin \\
+\hline
+\end{tabularx}
+
+\subsection{操作 1：新增使用者（Create）}
+
+\subsubsection{請求參數}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "action": "create",
+  "user": "管理員",
+  "data": {
+    "email": "manager@example.com",
+    "username": "manager",
+    "name": "王經理",
+    "display_name": "王大明",
+    "title": "資深業務經理",
+    "role": "user"
+  }
+}
+\end{lstlisting}
+
+\subsubsection{參數說明}
+
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{欄位} & \textbf{必填} & \textbf{類型} & \textbf{說明} \\
+\hline
+action & ✓ & string & 固定值：create \\
+\hline
+user & ✓ & string & 操作者名稱 \\
+\hline
+data.email & ✓ & string & 使用者電子郵件 \\
+\hline
+data.username & ✓ & string & 使用者帳號 \\
+\hline
+data.name & ✓ & string & 使用者姓名 \\
+\hline
+data.display\_name & & string & 顯示名稱 \\
+\hline
+data.title & & string & 職稱 \\
+\hline
+data.role & ✓ & string & 角色（user/manager/admin） \\
+\hline
+\end{tabularx}
+
+\subsubsection{成功回應}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "status": "success",
+  "action": "create",
+  "message": "使用者新增成功",
+  "data": {
+    "id": "新生成的UUID",
+    "email": "manager@example.com",
+    "username": "manager",
+    "name": "王經理",
+    "display_name": "王大明",
+    "title": "資深業務經理",
+    "role": "user",
+    "created_at": "2026-01-06T16:34:00Z",
+    "created_by": "管理員"
+  }
+}
+\end{lstlisting}
+
+\subsection{操作 2：修改使用者資料（Update）}
+
+\subsubsection{請求參數}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "action": "update",
+  "user": "系統管理員",
+  "id": "cff46d5a-8d50-48a0-b9b3-92bdf0dde378",
+  "data": {
+    "email": "manager@example.com",
+    "name": "王經理",
+    "title": "資深業務經理",
+    "role": "admin"
+  }
+}
+\end{lstlisting}
+
+\subsubsection{參數說明}
+
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{欄位} & \textbf{必填} & \textbf{類型} & \textbf{說明} \\
+\hline
+action & ✓ & string & 固定值：update \\
+\hline
+user & ✓ & string & 操作者名稱 \\
+\hline
+id & ✓ & string & 要修改的使用者 UUID \\
+\hline
+data & ✓ & object & 要更新的欄位（僅需包含需修改的欄位） \\
+\hline
+\end{tabularx}
+
+\textbf{注意事項：}
+\begin{itemize}
+\item data 中僅需包含需要更新的欄位
+\item 未提供的欄位將保持原值不變
+\item 回傳時會返回完整的使用者物件
+\end{itemize}
+
+\subsubsection{成功回應}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "status": "success",
+  "action": "update",
+  "message": "使用者資料已更新",
+  "data": {
+    "id": "cff46d5a-8d50-48a0-b9b3-92bdf0dde378",
+    "email": "manager@example.com",
+    "username": "manager",
+    "name": "王經理",
+    "display_name": "王大明",
+    "title": "資深業務經理",
+    "role": "admin",
+    "updated_at": "2026-01-06T16:34:00Z",
+    "updated_by": "系統管理員"
+  }
+}
+\end{lstlisting}
+
+\newpage
+
+\section{API 2：社區管理}
+
+\subsection{基本資訊}
+
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{項目} & \textbf{說明} \\
+\hline
+功能說明 & 管理社區資料（新增、修改、刪除） \\
+\hline
+請求方法 & POST \\
+\hline
+API 路徑（正式）& /webhook/admin/communities \\
+\hline
+API 路徑（測試）& /webhook-test/admin/communities \\
+\hline
+需要認證 & 是 \\
+\hline
+權限要求 & manager 或 admin \\
+\hline
+\end{tabularx}
+
+\subsection{操作 1：新增社區（Create）}
+
+\subsubsection{請求參數}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "action": "create",
+  "user": "錦宣",
+  "data": {
+    "builder": "測試建商",
+    "community_name": "【測試用】待刪除社區",
+    "completion_date": "110",
+    "total_units": "99",
+    "unit_area_range": "30/40"
+  }
+}
+\end{lstlisting}
+
+\subsubsection{參數說明}
+
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{欄位} & \textbf{必填} & \textbf{類型} & \textbf{說明} \\
+\hline
+action & ✓ & string & 固定值：create \\
+\hline
+user & ✓ & string & 操作者名稱 \\
+\hline
+data.builder & ✓ & string & 建商名稱 \\
+\hline
+data.community\_name & ✓ & string & 社區名稱 \\
+\hline
+data.completion\_date & ✓ & string & 完工年份（民國年） \\
+\hline
+data.total\_units & ✓ & string & 總戶數 \\
+\hline
+data.unit\_area\_range & ✓ & string & 坪數範圍（格式：最小/最大） \\
+\hline
+\end{tabularx}
+
+\subsubsection{成功回應}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "status": "success",
+  "action": "create",
+  "message": "社區新增成功",
+  "data": {
+    "id": "新生成的UUID",
+    "builder": "測試建商",
+    "community_name": "【測試用】待刪除社區",
+    "completion_date": "110",
+    "total_units": "99",
+    "unit_area_range": "30/40",
+    "created_at": "2026-01-06T16:34:00Z",
+    "created_by": "錦宣"
+  }
+}
+\end{lstlisting}
+
+\subsection{操作 2：修改社區（Update）}
+
+\subsubsection{請求參數}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "action": "update",
+  "user": "錦宣",
+  "id": "beb6a14c-dbb0-407f-a29f-5e3067ab9758",
+  "data": {
+    "total_units": "120",
+    "completion_date": "111"
+  }
+}
+\end{lstlisting}
+
+\subsubsection{參數說明}
+
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{欄位} & \textbf{必填} & \textbf{類型} & \textbf{說明} \\
+\hline
+action & ✓ & string & 固定值：update \\
+\hline
+user & ✓ & string & 操作者名稱 \\
+\hline
+id & ✓ & string & 要修改的社區 UUID \\
+\hline
+data & ✓ & object & 要更新的欄位（僅需包含需修改的欄位） \\
+\hline
+\end{tabularx}
+
+\textbf{注意事項：}
+\begin{itemize}
+\item data 中僅需包含需要更新的欄位
+\item 未提供的欄位將保持原值不變
+\item 回傳時會返回完整的社區物件
+\end{itemize}
+
+\subsection{操作 3：刪除社區（Delete）}
+
+\subsubsection{請求參數}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "action": "delete",
+  "user": "錦宣",
+  "id": "beb6a14c-dbb0-407f-a29f-5e3067ab9758"
+}
+\end{lstlisting}
+
+\subsubsection{成功回應}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "status": "success",
+  "action": "delete",
+  "message": "社區已刪除",
+  "deleted_id": "beb6a14c-dbb0-407f-a29f-5e3067ab9758"
+}
+\end{lstlisting}
+
+\newpage
+
+\section{API 3：物件管理}
+
+\subsection{基本資訊}
+
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{項目} & \textbf{說明} \\
+\hline
+功能說明 & 管理房屋物件資料（新增、修改、刪除） \\
+\hline
+請求方法 & POST \\
+\hline
+API 路徑（正式）& /webhook/admin/properties \\
+\hline
+API 路徑（測試）& /webhook-test/admin/properties \\
+\hline
+需要認證 & 是 \\
+\hline
+權限要求 & manager 或 admin \\
+\hline
+\end{tabularx}
+
+\subsection{操作 1：新增物件（Create）}
+
+\subsubsection{請求參數}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "action": "create",
+  "user": "錦宣",
+  "data": {
+    "community_name": "遠雄文華匯",
+    "total_price": 1200,
+    "total_ping": 30.5,
+    "parking_ping": 5.2,
+    "parking_price": 200,
+    "floor_info": "8樓/共15樓",
+    "address": "桃園市中壢區中央西路123號8樓",
+    "status": "專任",
+    "layout": "3房2廳2衛",
+    "notes": "面公園，採光佳，屋況良好"
+  }
+}
+\end{lstlisting}
+
+\subsubsection{參數說明}
+
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{欄位} & \textbf{必填} & \textbf{類型} & \textbf{說明} \\
+\hline
+action & ✓ & string & 固定值：create \\
+\hline
+user & ✓ & string & 操作者名稱 \\
+\hline
+data.community\_name & ✓ & string & 社區名稱 \\
+\hline
+data.total\_price & ✓ & number & 總價（單位：萬） \\
+\hline
+data.total\_ping & ✓ & number & 總坪數 \\
+\hline
+data.parking\_ping & & number & 車位坪數 \\
+\hline
+data.parking\_price & & number & 車位價格（單位：萬） \\
+\hline
+data.floor\_info & ✓ & string & 樓層資訊 \\
+\hline
+data.address & ✓ & string & 地址 \\
+\hline
+data.status & ✓ & string & 狀態（專任/一般/已成交等） \\
+\hline
+data.layout & ✓ & string & 格局（如：3房2廳2衛） \\
+\hline
+data.notes & & string & 備註 \\
+\hline
+\end{tabularx}
+
+\subsubsection{成功回應}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "status": "success",
+  "action": "create",
+  "message": "物件新增成功",
+  "data": {
+    "id": "067cc432-7dca-4898-a25c-c08065e480ea",
+    "community_name": "遠雄文華匯",
+    "total_price": 1200,
+    "total_ping": 30.5,
+    "parking_ping": 5.2,
+    "parking_price": 200,
+    "floor_info": "8樓/共15樓",
+    "address": "桃園市中壢區中央西路123號8樓",
+    "status": "專任",
+    "layout": "3房2廳2衛",
+    "notes": "面公園，採光佳，屋況良好",
+    "created_at": "2026-01-06T16:34:00Z",
+    "created_by": "錦宣"
+  }
+}
+\end{lstlisting}
+
+\subsection{操作 2：修改物件（Update）}
+
+\subsubsection{請求參數}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "action": "update",
+  "user": "錦宣",
+  "id": "067cc432-7dca-4898-a25c-c08065e480ea",
+  "data": {
+    "total_price": 1280,
+    "status": "已成交"
+  }
+}
+\end{lstlisting}
+
+\subsubsection{參數說明}
+
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{欄位} & \textbf{必填} & \textbf{類型} & \textbf{說明} \\
+\hline
+action & ✓ & string & 固定值：update \\
+\hline
+user & ✓ & string & 操作者名稱 \\
+\hline
+id & ✓ & string & 要修改的物件 UUID \\
+\hline
+data & ✓ & object & 要更新的欄位（僅需包含需修改的欄位） \\
+\hline
+\end{tabularx}
+
+\textbf{注意事項：}
+\begin{itemize}
+\item data 中僅需包含需要更新的欄位
+\item 未提供的欄位將保持原值不變
+\item 回傳時會返回完整的物件內容
+\end{itemize}
+
+\subsubsection{成功回應}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "status": "success",
+  "action": "update",
+  "message": "物件資料已更新",
+  "data": {
+    "id": "067cc432-7dca-4898-a25c-c08065e480ea",
+    "community_name": "遠雄文華匯",
+    "total_price": 1280,
+    "total_ping": 30.5,
+    "parking_ping": 5.2,
+    "parking_price": 200,
+    "floor_info": "8樓/共15樓",
+    "address": "桃園市中壢區中央西路123號8樓",
+    "status": "已成交",
+    "layout": "3房2廳2衛",
+    "notes": "面公園，採光佳，屋況良好",
+    "updated_at": "2026-01-06T16:34:00Z",
+    "updated_by": "錦宣"
+  }
+}
+\end{lstlisting}
+
+\subsection{操作 3：刪除物件（Delete）}
+
+\subsubsection{請求參數}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "action": "delete",
+  "user": "錦宣",
+  "id": "067cc432-7dca-4898-a25c-c08065e480ea"
+}
+\end{lstlisting}
+
+\subsubsection{成功回應}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "status": "success",
+  "action": "delete",
+  "message": "物件已刪除",
+  "deleted_id": "067cc432-7dca-4898-a25c-c08065e480ea"
+}
+\end{lstlisting}
+
+\newpage
+
+\section{API 4：照片上傳}
+
+\subsection{基本資訊}
+
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{項目} & \textbf{說明} \\
+\hline
+功能說明 & 上傳物件照片至 Supabase Storage \\
+\hline
+請求方法 & POST \\
+\hline
+API 路徑 & /webhook/admin/photos/upload \\
+\hline
+Content-Type & multipart/form-data \\
+\hline
+需要認證 & 是 \\
+\hline
+權限要求 & manager 或 admin \\
+\hline
+\end{tabularx}
+
+\subsection{請求參數（multipart/form-data）}
+
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{欄位名稱} & \textbf{必填} & \textbf{類型} & \textbf{說明} \\
+\hline
+property\_id & ✓ & string & 物件 UUID \\
+\hline
+file & ✓ & file & 圖片檔案（支援 jpg, jpeg, png） \\
+\hline
+user & ✓ & string & 操作者名稱 \\
+\hline
+description & & string & 照片描述 \\
+\hline
+\end{tabularx}
+
+\subsection{INPUT 規格說明}
+
+\textbf{檔案規格：}
+\begin{itemize}
+\item \textbf{支援格式}：JPG, JPEG, PNG
+\item \textbf{檔案大小限制}：最大 10 MB
+\item \textbf{建議尺寸}：1920x1080 或更小
+\item \textbf{編碼方式}：multipart/form-data
+\end{itemize}
+
+\textbf{請求範例（使用 curl）：}
+
+\begin{lstlisting}[language=bash]
+curl -X POST \
+  https://findmyhome.zeabur.app/webhook/admin/photos/upload \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -F "property_id=067cc432-7dca-4898-a25c-c08065e480ea" \
+  -F "user=錦宣" \
+  -F "file=@/path/to/image.jpg" \
+  -F "description=客廳照片"
+\end{lstlisting}
+
+\textbf{請求範例（JavaScript FormData）：}
+
+\begin{lstlisting}[language=JavaScript]
+const formData = new FormData();
+formData.append('property_id', '067cc432-7dca-4898-a25c-c08065e480ea');
+formData.append('user', '錦宣');
+formData.append('file', fileInput.files[0]); // HTML input element
+formData.append('description', '客廳照片');
+
+fetch('https://findmyhome.zeabur.app/webhook/admin/photos/upload', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${jwtToken}`
+  },
+  body: formData
+})
+.then(response => response.json())
+.then(data => console.log(data));
+\end{lstlisting}
+
+\subsection{成功回應}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "status": "success",
+  "message": "照片上傳成功",
+  "data": {
+    "photo_id": "新生成的UUID",
+    "property_id": "067cc432-7dca-4898-a25c-c08065e480ea",
+    "url": "https://supabase-storage-url/photos/filename.jpg",
+    "description": "客廳照片",
+    "uploaded_at": "2026-01-06T16:34:00Z",
+    "uploaded_by": "錦宣"
+  }
+}
+\end{lstlisting}
+
+\subsection{錯誤回應}
+
+\begin{lstlisting}[language=JavaScript]
+// 檔案格式錯誤
+{
+  "status": "error",
+  "code": "INVALID_FILE_FORMAT",
+  "message": "不支援的檔案格式，僅接受 JPG, JPEG, PNG"
+}
+
+// 檔案過大
+{
+  "status": "error",
+  "code": "FILE_TOO_LARGE",
+  "message": "檔案大小超過限制（最大 10 MB）"
+}
+
+// 缺少必填欄位
+{
+  "status": "error",
+  "code": "MISSING_REQUIRED_FIELD",
+  "message": "缺少必填欄位：property_id"
+}
+\end{lstlisting}
+
+\newpage
+
+\section{錯誤代碼與處理}
+
+\subsection{認證與權限錯誤}
+
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\textbf{錯誤代碼} & \textbf{HTTP} & \textbf{說明} \\
+\hline
+INVALID\_TOKEN & 401 & Google ID Token 或 JWT 無效 \\
+\hline
+JWT\_EXPIRED & 401 & JWT Token 已過期 \\
+\hline
+MISSING\_TOKEN & 401 & 缺少認證 Token \\
+\hline
+INSUFFICIENT\_PERMISSIONS & 403 & 權限不足 \\
+\hline
+ROLE\_REQUIRED\_MANAGER & 403 & 需要 manager 或更高權限 \\
+\hline
+ROLE\_REQUIRED\_ADMIN & 403 & 需要 admin 權限 \\
+\hline
+\end{tabularx}
+
+\subsection{資料驗證錯誤}
+
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\textbf{錯誤代碼} & \textbf{HTTP} & \textbf{說明} \\
+\hline
+MISSING\_REQUIRED\_FIELD & 400 & 缺少必填欄位 \\
+\hline
+INVALID\_ACTION & 400 & 無效的操作類型 \\
+\hline
+INVALID\_UUID & 400 & 無效的 UUID 格式 \\
+\hline
+RECORD\_NOT\_FOUND & 404 & 找不到指定記錄 \\
+\hline
+DUPLICATE\_ENTRY & 400 & 資料重複（如 email 已存在） \\
+\hline
+\end{tabularx}
+
+\subsection{檔案上傳錯誤}
+
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\textbf{錯誤代碼} & \textbf{HTTP} & \textbf{說明} \\
+\hline
+INVALID\_FILE\_FORMAT & 400 & 不支援的檔案格式 \\
+\hline
+FILE\_TOO\_LARGE & 400 & 檔案大小超過限制 \\
+\hline
+UPLOAD\_FAILED & 500 & 檔案上傳失敗 \\
+\hline
+\end{tabularx}
+
+\newpage
+
+\section{前端整合範例}
+
+\subsection{權限檢查 Hook（React）}
+
+\begin{lstlisting}[language=JavaScript]
+import { useState, useEffect } from 'react';
+import { jwtDecode } from 'jwt-decode';
+
+function useAuth() {
+  const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setUser(decoded);
+        setRole(decoded.role);
+      } catch (error) {
+        console.error('Invalid token');
+        localStorage.removeItem('access_token');
+      }
+    }
+  }, []);
+
+  const hasRole = (requiredRole) => {
+    if (!role) return false;
+    const roleHierarchy = { user: 0, manager: 1, admin: 2 };
+    return roleHierarchy[role] >= roleHierarchy[requiredRole];
+  };
+
+  const canManageData = () => hasRole('manager');
+  const canManageUsers = () => role === 'admin';
+
+  return {
+    user,
+    role,
+    hasRole,
+    canManageData,
+    canManageUsers
+  };
+}
+
+export default useAuth;
+\end{lstlisting}
+
+\subsection{API 呼叫範例}
+
+\begin{lstlisting}[language=JavaScript]
+// 新增社區
+async function createCommunity(communityData) {
+  const token = localStorage.getItem('access_token');
+
+  const response = await fetch(
+    'https://findmyhome.zeabur.app/webhook/admin/communities',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        action: 'create',
+        user: '錦宣',
+        data: communityData
+      })
+    }
+  );
+
+  return await response.json();
+}
+
+// 修改物件
+async function updateProperty(propertyId, updates) {
+  const token = localStorage.getItem('access_token');
+
+  const response = await fetch(
+    'https://findmyhome.zeabur.app/webhook/admin/properties',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        action: 'update',
+        user: '錦宣',
+        id: propertyId,
+        data: updates
+      })
+    }
+  );
+
+  return await response.json();
+}
+\end{lstlisting}
+
+\newpage
+
+\section{附錄：資料表欄位結構}
+
+\subsection{資料查詢端點}
+
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{項目} & \textbf{說明} \\
+\hline
+API 路徑 & /webhook/all-data \\
+\hline
+請求方法 & GET \\
+\hline
+需要認證 & 否 \\
+\hline
+說明 & 取得所有資料（物件、社區、使用者） \\
+\hline
+\end{tabularx}
+
+\subsection{物件資料表（properties\_for\_sale）}
+
+從 API 端點 \texttt{/webhook/all-data} 取得的實際欄位結構：
+
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{欄位名稱} & \textbf{類型} & \textbf{可空} & \textbf{說明} \\
+\hline
+id & UUID & 否 & 唯一識別碼 \\
+\hline
+community\_name & string & 否 & 社區名稱 \\
+\hline
+total\_price & number & 是 & 總價（萬元） \\
+\hline
+total\_ping & number & 是 & 總坪數 \\
+\hline
+parking\_ping & number & 是 & 車位坪數 \\
+\hline
+parking\_price & number & 是 & 車位價格（萬元） \\
+\hline
+notes & string & 是 & 備註 \\
+\hline
+floor\_info & string & 是 & 樓層資訊（如：15樓 / 共15樓） \\
+\hline
+address & string & 是 & 地址 \\
+\hline
+status & string & 是 & 狀態（專任/一般/下架/屋主等） \\
+\hline
+layout & string & 是 & 格局（如：3房2廳2衛） \\
+\hline
+agent & string & 否 & 經辦人（建立者） \\
+\hline
+maintainer & string & 否 & 維護人（最後修改者） \\
+\hline
+created\_at\_source & date & 否 & 建立日期 \\
+\hline
+updated\_at\_source & date & 否 & 更新日期 \\
+\hline
+imported\_at & timestamp & 否 & 系統匯入時間 \\
+\hline
+photo\_paths & array & 是 & 照片路徑陣列 \\
+\hline
+cover\_photo\_path & string & 是 & 封面照片路徑 \\
+\hline
+\end{tabularx}
+
+\subsection{社區資料表（communities）}
+
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{欄位名稱} & \textbf{類型} & \textbf{可空} & \textbf{說明} \\
+\hline
+id & UUID & 否 & 唯一識別碼 \\
+\hline
+builder & string & 否 & 建商名稱 \\
+\hline
+community\_name & string & 否 & 社區名稱 \\
+\hline
+completion\_date & string & 是 & 完工年份（民國年） \\
+\hline
+total\_units & string & 是 & 總戶數 \\
+\hline
+unit\_area\_range & string & 是 & 坪數範圍（格式：最小/最大） \\
+\hline
+agent & string & 否 & 經辦人（建立者） \\
+\hline
+maintainer & string & 否 & 維護人（Creator 或最後修改者） \\
+\hline
+created\_at\_source & date & 否 & 建立日期 \\
+\hline
+updated\_at\_source & date & 否 & 更新日期 \\
+\hline
+\end{tabularx}
+
+\subsection{使用者資料表（users）}
+
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{欄位名稱} & \textbf{類型} & \textbf{可空} & \textbf{說明} \\
+\hline
+id & UUID & 否 & 唯一識別碼 \\
+\hline
+email & string & 否 & 電子郵件（唯一） \\
+\hline
+username & string & 否 & 使用者帳號 \\
+\hline
+name & string & 否 & 使用者姓名 \\
+\hline
+display\_name & string & 是 & 顯示名稱 \\
+\hline
+title & string & 是 & 職稱 \\
+\hline
+role & string & 否 & 角色（user/manager/admin） \\
+\hline
+Creator & string & 是 & 建立者 \\
+\hline
+maintainer & string & 是 & 維護人 \\
+\hline
+created\_at\_source & date & 是 & 建立日期 \\
+\hline
+updated\_at\_source & date & 是 & 更新日期 \\
+\hline
+\end{tabularx}
+
+\subsection{API 回應範例}
+
+\textbf{GET /webhook/all-data 回應格式：}
+
+\begin{lstlisting}[language=JavaScript]
+{
+  "properties_for_sale": [
+    {
+      "id": "82f8542a-63d2-46b6-bfdc-71480d2e702e",
+      "community_name": "新潤A18",
+      "total_price": 1028,
+      "total_ping": 13.764,
+      "parking_ping": null,
+      "parking_price": null,
+      "notes": null,
+      "floor_info": "15樓 / 共15樓",
+      "address": "桃園市中壢區春德路",
+      "status": "一般",
+      "layout": null,
+      "agent": "錦宣",
+      "maintainer": "錦宣",
+      "created_at_source": "2025-12-21",
+      "updated_at_source": "2025-12-21",
+      "imported_at": "2025-12-21T13:46:04.601305+00:00",
+      "photo_paths": [],
+      "cover_photo_path": null
+    }
+    // ... 更多物件
+  ],
+  "communities": [
+    // 社區資料
+  ],
+  "users": [
+    // 使用者資料
+  ]
+}
+\end{lstlisting}
+
+\end{document}
