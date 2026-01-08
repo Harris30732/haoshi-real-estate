@@ -396,8 +396,20 @@ async function saveCommunityInlineEdit(communityId) {
     }
 
     try {
-        // Call API to update community
-        await apiRequest(CONFIG.ENDPOINTS.ADMIN.UPDATE_COMMUNITY, 'POST', updatedData);
+        // Call API to update community with correct format
+        const user = getCurrentUser();
+        await apiRequest(CONFIG.ENDPOINTS.COMMUNITIES, 'POST', {
+            action: 'update',
+            user: user?.name || '系統',
+            id: communityId,
+            data: {
+                builder: updatedData.builder,
+                community_name: updatedData.community_name,
+                completion_date: updatedData.completion_date,
+                total_units: updatedData.total_units,
+                unit_area_range: updatedData.unit_area_range
+            }
+        });
 
         // Update local cache
         const communities = getCommunitiesCache();
