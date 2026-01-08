@@ -489,6 +489,14 @@ async function saveCommunity() {
         }
 
         resetCommunityForm();
+
+        // Clear search box to ensure new item is visible
+        const searchBox = document.getElementById('communitySearch');
+        if (searchBox) {
+            searchBox.value = '';
+        }
+
+        // Reload the list (without any search filter)
         loadCommunityList();
         populateCommunityFilters();
     } catch (error) {
@@ -524,6 +532,9 @@ function confirmDeleteCommunity(communityId) {
 
 // ==================== User Modal ====================
 
+// Track editing state for users
+let editingUserId = null;
+
 /**
  * Load user list
  */
@@ -538,8 +549,23 @@ function loadUserList() {
         return;
     }
 
-    tbody.innerHTML = users.map(u => `
-    <tr data-id="${u.id}">
+    tbody.innerHTML = users.map(u => renderUserRow(u)).join('');
+}
+
+/**
+ * Render a single user row
+ * @param {Object} u - User data
+ * @returns {string}
+ */
+function renderUserRow(u) {
+    const isEditing = editingUserId === u.id;
+
+    if (isEditing) {
+        return renderUserEditModeRow(u);
+    }
+
+    return `
+    <tr data-id="${u.id}" class="user-row">
       <td>${escapeHtml(u.name || '-')}</td>
       <td>${escapeHtml(u.email || '-')}</td>
       <td>${escapeHtml(u.title || '-')}</td>
@@ -560,22 +586,144 @@ function loadUserList() {
       </td>
       <td>
         <div class="table-actions">
-          <button class="action-icon-btn edit" onclick="editUser('${u.id}')" title="編輯">
+          <button class="action-icon-btn edit" onclick="startUserInlineEdit('${u.id}')" title="編輯">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
           </button>
-          <button class="action-icon-btn delete" onclick="confirmDeleteUser('${u.id}')" title="刪除">
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+/**
+ * Render user row in edit mode
+ * @param {Object} u - User data
+ * @returns {string}
+ */
+function renderUserEditModeRow(u) {
+    return `
+    <tr data-id="${u.id}" class="user-row editing">
+      <td><input type="text" class="edit-input" data-field="name" value="${escapeHtml(u.name || '')}" placeholder="姓名"></td>
+      <td><input type="email" class="edit-input" data-field="email" value="${escapeHtml(u.email || '')}" placeholder="Email"></td>
+      <td><input type="text" class="edit-input" data-field="title" value="${escapeHtml(u.title || '')}" placeholder="職稱"></td>
+      <td>
+        <select class="edit-input edit-select" data-field="role">
+          <option value="user" ${u.role === 'user' ? 'selected' : ''}>一般使用者</option>
+          <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>管理者</option>
+          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>系統管理員</option>
+        </select>
+      </td>
+      <td>
+        <select class="edit-input edit-select" data-field="is_active">
+          <option value="true" ${u.is_active ? 'selected' : ''}>啟用</option>
+          <option value="false" ${!u.is_active ? 'selected' : ''}>停用</option>
+        </select>
+      </td>
+      <td>${formatDate(u.last_login)}</td>
+      <td>
+        <div class="meta-info">
+          <span class="meta-user">${escapeHtml(u.Creator || '-')}</span>
+          <span class="meta-time">${formatDate(u.created_at_source)}</span>
+        </div>
+      </td>
+      <td>
+        <div class="meta-info">
+          <span class="meta-user">${escapeHtml(u.maintainer || '-')}</span>
+          <span class="meta-time">${formatDate(u.updated_at_source)}</span>
+        </div>
+      </td>
+      <td>
+        <div class="edit-actions">
+          <button class="action-btn-save" onclick="saveUserInlineEdit('${u.id}')" title="儲存">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            完成
+          </button>
+          <button class="action-btn-cancel" onclick="cancelUserInlineEdit()" title="取消">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+}
+
+/**
+ * Start inline editing for a user
+ * @param {string} userId 
+ */
+function startUserInlineEdit(userId) {
+    editingUserId = userId;
+    loadUserList();
+}
+
+/**
+ * Cancel user inline edit
+ */
+function cancelUserInlineEdit() {
+    editingUserId = null;
+    loadUserList();
+}
+
+/**
+ * Save user inline edit
+ * @param {string} userId 
+ */
+async function saveUserInlineEdit(userId) {
+    const row = document.querySelector(`#userTableBody tr[data-id="${userId}"]`);
+    if (!row) return;
+
+    // Collect values from inputs
+    const updatedData = {
+        name: row.querySelector('input[data-field="name"]')?.value || '',
+        email: row.querySelector('input[data-field="email"]')?.value || '',
+        title: row.querySelector('input[data-field="title"]')?.value || '',
+        role: row.querySelector('select[data-field="role"]')?.value || 'user',
+        is_active: row.querySelector('select[data-field="is_active"]')?.value === 'true'
+    };
+
+    // Validate required fields
+    if (!updatedData.name || !updatedData.email) {
+        showToast('error', '請填寫必填欄位', '姓名和 Email 為必填');
+        return;
+    }
+
+    // Show saving state
+    row.classList.add('saving');
+    const saveBtn = row.querySelector('.action-btn-save');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-small"></span> 儲存中...';
+    }
+
+    try {
+        // Call API to update user
+        await updateUser(userId, updatedData);
+
+        showToast('success', '成員已更新', '');
+        editingUserId = null;
+        loadUserList();
+
+    } catch (error) {
+        showToast('error', '更新失敗', error.message);
+        row.classList.remove('saving');
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = `
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              完成
+            `;
+        }
+    }
 }
 
 /**
@@ -600,25 +748,11 @@ function renderRoleBadge(role) {
 }
 
 /**
- * Edit user
+ * Edit user - now redirects to inline edit
  * @param {string} userId 
  */
 function editUser(userId) {
-    const user = getUsersCache().find(u => u.id === userId);
-    if (!user) {
-        showToast('error', '找不到成員', '');
-        return;
-    }
-
-    document.getElementById('userId').value = userId;
-    document.getElementById('userName').value = user.name || '';
-    document.getElementById('userEmailInput').value = user.email || '';
-    document.getElementById('userTitle').value = user.title || '';
-    document.getElementById('userRole').value = user.role || 'user';
-    document.getElementById('userIsActive').value = user.is_active ? 'true' : 'false';
-
-    // Scroll to form
-    document.getElementById('userForm').scrollIntoView({ behavior: 'smooth' });
+    startUserInlineEdit(userId);
 }
 
 /**
@@ -630,7 +764,7 @@ function resetUserForm() {
 }
 
 /**
- * Save user
+ * Save user (for new users only now)
  */
 async function saveUser() {
     const form = document.getElementById('userForm');
@@ -640,6 +774,13 @@ async function saveUser() {
     }
 
     const userId = document.getElementById('userId').value;
+
+    // If there's a userId, it means we're editing - but now we only use this for new users
+    if (userId) {
+        showToast('warning', '請使用行內編輯', '編輯請點擊列表中的編輯按鈕');
+        return;
+    }
+
     const userData = {
         name: document.getElementById('userName').value,
         email: document.getElementById('userEmailInput').value,
@@ -650,15 +791,8 @@ async function saveUser() {
 
     try {
         showLoading();
-
-        if (userId) {
-            await updateUser(userId, userData);
-            showToast('success', '成員已更新', '');
-        } else {
-            await createUser(userData);
-            showToast('success', '成員已新增', '');
-        }
-
+        await createUser(userData);
+        showToast('success', '成員已新增', '');
         resetUserForm();
         loadUserList();
     } catch (error) {
@@ -900,17 +1034,18 @@ function renderPhotoGrid() {
 
     grid.innerHTML = currentPhotos.map((url, index) => {
         const isCover = url === coverPhoto;
+        // Use index instead of URL to avoid escaping issues
         return `
-        <div class="photo-grid-item" data-url="${url}">
+        <div class="photo-grid-item" data-index="${index}">
             ${isCover ? '<span class="cover-badge">封面</span>' : ''}
-            <img src="${url}?width=200&height=150&resize=cover" alt="照片 ${index + 1}">
+            <img src="${escapeHtml(url)}?width=200&height=150&resize=cover" alt="照片 ${index + 1}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 150%22><rect fill=%22%23f3f4f6%22 width=%22200%22 height=%22150%22/><text x=%22100%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%239ca3af%22>載入失敗</text></svg>'">
             <div class="photo-overlay">
-                <button class="photo-action-btn cover" onclick="setCoverPhoto('${url}')" title="設為封面">
+                <button class="photo-action-btn cover" onclick="setCoverPhotoByIndex(${index})" title="設為封面">
                     <svg viewBox="0 0 24 24" fill="${isCover ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                     </svg>
                 </button>
-                <button class="photo-action-btn delete" onclick="deletePhoto('${url}')" title="刪除">
+                <button class="photo-action-btn delete" onclick="deletePhotoByIndex(${index})" title="刪除">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"/>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -999,7 +1134,7 @@ async function uploadPhotos(files) {
 
     try {
         progressText.textContent = `上傳中 (${files.length} 張)...`;
-        progressFill.style.width = '50%';
+        progressFill.style.width = '30%';
 
         const response = await fetch(`${CONFIG.API_BASE_URL}${CONFIG.ENDPOINTS.PHOTOS}`, {
             method: 'POST',
@@ -1007,7 +1142,7 @@ async function uploadPhotos(files) {
         });
 
         const result = await response.json();
-        progressFill.style.width = '100%';
+        progressFill.style.width = '60%';
 
         if (result.status === 'success' && result.files) {
             // Add new photos to current list
@@ -1016,6 +1151,21 @@ async function uploadPhotos(files) {
                     currentPhotos.push(file.public_url);
                 }
             });
+
+            progressText.textContent = '儲存照片資料...';
+            progressFill.style.width = '80%';
+
+            // IMPORTANT: Save photo_paths to backend immediately
+            await apiRequest(CONFIG.ENDPOINTS.PROPERTIES, 'POST', {
+                action: 'update',
+                user: user?.name || '系統',
+                id: currentPhotoPropertyId,
+                data: {
+                    photo_paths: currentPhotos
+                }
+            });
+
+            progressFill.style.width = '100%';
 
             // Update property cache
             const properties = getPropertiesCache();
@@ -1027,11 +1177,12 @@ async function uploadPhotos(files) {
             progressText.textContent = `上傳成功！(${result.files.length} 張)`;
             showToast('success', '照片上傳成功', `已上傳 ${result.files.length} 張照片`);
 
-            // Refresh grid
+            // Refresh grid only (don't refresh table to keep edit mode)
             setTimeout(() => {
                 progressDiv.classList.add('hidden');
                 renderPhotoGrid();
-                renderPropertiesTable();
+                // Update photo badge in table without full refresh
+                updatePhotoCountBadge(currentPhotoPropertyId, currentPhotos.length);
             }, 1000);
         } else {
             throw new Error(result.message || '上傳失敗');
@@ -1040,6 +1191,52 @@ async function uploadPhotos(files) {
         progressText.textContent = '上傳失敗';
         showToast('error', '上傳失敗', error.message);
         setTimeout(() => progressDiv.classList.add('hidden'), 2000);
+    }
+}
+
+/**
+ * Update photo count badge in table without full refresh
+ * @param {string} propertyId 
+ * @param {number} count 
+ */
+function updatePhotoCountBadge(propertyId, count) {
+    const row = document.querySelector(`tr[data-id="${propertyId}"]`);
+    if (row) {
+        const photoBtn = row.querySelector('.photo-btn');
+        if (photoBtn) {
+            const existingBadge = photoBtn.querySelector('.photo-count');
+            if (count > 0) {
+                if (existingBadge) {
+                    existingBadge.textContent = count;
+                } else {
+                    photoBtn.classList.add('has-photos');
+                    photoBtn.insertAdjacentHTML('beforeend', `<span class="photo-count">${count}</span>`);
+                }
+            } else if (existingBadge) {
+                existingBadge.remove();
+                photoBtn.classList.remove('has-photos');
+            }
+        }
+    }
+}
+
+/**
+ * Delete photo by index (wrapper for deletePhoto)
+ * @param {number} index 
+ */
+function deletePhotoByIndex(index) {
+    if (index >= 0 && index < currentPhotos.length) {
+        deletePhoto(currentPhotos[index]);
+    }
+}
+
+/**
+ * Set cover photo by index (wrapper for setCoverPhoto)
+ * @param {number} index 
+ */
+function setCoverPhotoByIndex(index) {
+    if (index >= 0 && index < currentPhotos.length) {
+        setCoverPhoto(currentPhotos[index]);
     }
 }
 
@@ -1081,7 +1278,15 @@ async function deletePhoto(photoUrl) {
         renderPhotoGrid();
         renderPropertiesTable();
     } catch (error) {
+        // Restore photo if API failed
         showToast('error', '刪除失敗', error.message);
+        // Re-read from cache
+        const properties = getPropertiesCache();
+        const property = properties.find(p => p.id === currentPhotoPropertyId);
+        if (property) {
+            currentPhotos = property.photo_paths || [];
+        }
+        renderPhotoGrid();
     }
 }
 

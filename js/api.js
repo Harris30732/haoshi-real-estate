@@ -129,9 +129,26 @@ async function createProperty(propertyData) {
             body: JSON.stringify(payload)
         });
 
-        // Update cache
-        if (result.data) {
-            propertiesCache.push(result.data);
+        // Update cache with API response data, or construct from input if not available
+        // Handle case where API returns data as an array
+        let responseData = result.data;
+        if (Array.isArray(responseData)) {
+            responseData = responseData[0];
+        }
+
+        if (responseData && typeof responseData === 'object') {
+            propertiesCache.push(responseData);
+            result.data = responseData;
+        } else if (result.status === 'success') {
+            // API succeeded but didn't return data object, construct from input
+            const newProperty = {
+                id: result.id || 'new-' + Date.now(),
+                ...propertyData,
+                created_at_source: new Date().toISOString().split('T')[0],
+                agent: getCurrentUserName()
+            };
+            propertiesCache.push(newProperty);
+            result.data = newProperty;
         }
 
         return result;
@@ -170,8 +187,26 @@ async function updateProperty(id, propertyData) {
 
         // Update cache
         const index = propertiesCache.findIndex(p => p.id === id);
-        if (index !== -1 && result.data) {
-            propertiesCache[index] = result.data;
+        if (index !== -1) {
+            // Handle case where API returns data as an array
+            let responseData = result.data;
+            if (Array.isArray(responseData)) {
+                responseData = responseData[0];
+            }
+
+            if (responseData && typeof responseData === 'object') {
+                propertiesCache[index] = responseData;
+                result.data = responseData;
+            } else if (result.status === 'success') {
+                // API succeeded but didn't return data object, merge with existing
+                propertiesCache[index] = {
+                    ...propertiesCache[index],
+                    ...propertyData,
+                    updated_at_source: new Date().toISOString().split('T')[0],
+                    maintainer: getCurrentUserName()
+                };
+                result.data = propertiesCache[index];
+            }
         }
 
         return result;
@@ -255,8 +290,26 @@ async function createCommunity(communityData) {
             body: JSON.stringify(payload)
         });
 
-        if (result.data) {
-            communitiesCache.push(result.data);
+        // Update cache with API response data, or construct from input if not available
+        // Handle case where API returns data as an array
+        let responseData = result.data;
+        if (Array.isArray(responseData)) {
+            responseData = responseData[0];
+        }
+
+        if (responseData && typeof responseData === 'object') {
+            communitiesCache.push(responseData);
+            result.data = responseData;
+        } else if (result.status === 'success') {
+            // API succeeded but didn't return data object, construct from input
+            const newCommunity = {
+                id: result.id || 'new-' + Date.now(),
+                ...communityData,
+                created_at_source: new Date().toISOString().split('T')[0],
+                Creator: getCurrentUserName()
+            };
+            communitiesCache.push(newCommunity);
+            result.data = newCommunity;
         }
 
         return result;
@@ -266,7 +319,7 @@ async function createCommunity(communityData) {
             id: 'demo-' + Date.now(),
             ...communityData,
             created_at_source: new Date().toISOString().split('T')[0],
-            agent: getCurrentUserName()
+            Creator: getCurrentUserName()
         };
         communitiesCache.push(newCommunity);
         return { status: 'success', data: newCommunity };
@@ -294,8 +347,26 @@ async function updateCommunity(id, communityData) {
         });
 
         const index = communitiesCache.findIndex(c => c.id === id);
-        if (index !== -1 && result.data) {
-            communitiesCache[index] = result.data;
+        if (index !== -1) {
+            // Handle case where API returns data as an array
+            let responseData = result.data;
+            if (Array.isArray(responseData)) {
+                responseData = responseData[0];
+            }
+
+            if (responseData && typeof responseData === 'object') {
+                communitiesCache[index] = responseData;
+                result.data = responseData;
+            } else if (result.status === 'success') {
+                // API succeeded but didn't return data object, merge with existing
+                communitiesCache[index] = {
+                    ...communitiesCache[index],
+                    ...communityData,
+                    updated_at_source: new Date().toISOString().split('T')[0],
+                    maintainer: getCurrentUserName()
+                };
+                result.data = communitiesCache[index];
+            }
         }
 
         return result;
@@ -378,8 +449,27 @@ async function createUser(userData) {
             body: JSON.stringify(payload)
         });
 
-        if (result.data) {
-            usersCache.push(result.data);
+        // Update cache with API response data, or construct from input if not available
+        // Handle case where API returns data as an array
+        let responseData = result.data;
+        if (Array.isArray(responseData)) {
+            responseData = responseData[0];
+        }
+
+        if (responseData && typeof responseData === 'object') {
+            usersCache.push(responseData);
+            result.data = responseData;
+        } else if (result.status === 'success') {
+            // API succeeded but didn't return data object, construct from input
+            const newUser = {
+                id: result.id || 'new-' + Date.now(),
+                ...userData,
+                is_active: userData.is_active !== undefined ? userData.is_active : true,
+                created_at_source: new Date().toISOString().split('T')[0],
+                Creator: getCurrentUserName()
+            };
+            usersCache.push(newUser);
+            result.data = newUser;
         }
 
         return result;
@@ -388,8 +478,9 @@ async function createUser(userData) {
         const newUser = {
             id: 'demo-' + Date.now(),
             ...userData,
-            is_active: true,
-            imported_at: new Date().toISOString()
+            is_active: userData.is_active !== undefined ? userData.is_active : true,
+            created_at_source: new Date().toISOString().split('T')[0],
+            Creator: getCurrentUserName()
         };
         usersCache.push(newUser);
         return { status: 'success', data: newUser };
@@ -417,8 +508,26 @@ async function updateUser(id, userData) {
         });
 
         const index = usersCache.findIndex(u => u.id === id);
-        if (index !== -1 && result.data) {
-            usersCache[index] = result.data;
+        if (index !== -1) {
+            // Handle case where API returns data as an array
+            let responseData = result.data;
+            if (Array.isArray(responseData)) {
+                responseData = responseData[0];
+            }
+
+            if (responseData && typeof responseData === 'object') {
+                usersCache[index] = responseData;
+                result.data = responseData;
+            } else if (result.status === 'success') {
+                // API succeeded but didn't return data object, merge with existing
+                usersCache[index] = {
+                    ...usersCache[index],
+                    ...userData,
+                    updated_at_source: new Date().toISOString().split('T')[0],
+                    maintainer: getCurrentUserName()
+                };
+                result.data = usersCache[index];
+            }
         }
 
         return result;
@@ -426,7 +535,12 @@ async function updateUser(id, userData) {
         // Demo mode
         const index = usersCache.findIndex(u => u.id === id);
         if (index !== -1) {
-            usersCache[index] = { ...usersCache[index], ...userData };
+            usersCache[index] = {
+                ...usersCache[index],
+                ...userData,
+                updated_at_source: new Date().toISOString().split('T')[0],
+                maintainer: getCurrentUserName()
+            };
         }
         return { status: 'success', data: usersCache[index] };
     }

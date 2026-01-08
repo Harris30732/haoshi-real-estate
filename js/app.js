@@ -15,8 +15,69 @@ async function initApp() {
     initTable();
     initUserDropdown();
     initChartToggle();
+    initTableDragScroll();
 
     console.log('🏠 好室房產系統已就緒');
+}
+
+/**
+ * Initialize middle-mouse-button drag scrolling for table
+ */
+function initTableDragScroll() {
+    const tableWrappers = document.querySelectorAll('.table-wrapper');
+
+    tableWrappers.forEach(wrapper => {
+        let isDragging = false;
+        let startX, startY, scrollLeft, scrollTop;
+
+        // Middle mouse button (button === 1)
+        wrapper.addEventListener('mousedown', (e) => {
+            if (e.button === 1) { // Middle mouse button
+                e.preventDefault();
+                isDragging = true;
+                wrapper.classList.add('dragging');
+                startX = e.pageX - wrapper.offsetLeft;
+                startY = e.pageY - wrapper.offsetTop;
+                scrollLeft = wrapper.scrollLeft;
+                scrollTop = wrapper.scrollTop;
+                wrapper.style.cursor = 'grabbing';
+            }
+        });
+
+        wrapper.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const x = e.pageX - wrapper.offsetLeft;
+            const y = e.pageY - wrapper.offsetTop;
+            const walkX = (x - startX) * 1.5; // Scroll speed multiplier
+            const walkY = (y - startY) * 1.5;
+            wrapper.scrollLeft = scrollLeft - walkX;
+            wrapper.scrollTop = scrollTop - walkY;
+        });
+
+        wrapper.addEventListener('mouseup', (e) => {
+            if (e.button === 1) {
+                isDragging = false;
+                wrapper.classList.remove('dragging');
+                wrapper.style.cursor = '';
+            }
+        });
+
+        wrapper.addEventListener('mouseleave', () => {
+            if (isDragging) {
+                isDragging = false;
+                wrapper.classList.remove('dragging');
+                wrapper.style.cursor = '';
+            }
+        });
+
+        // Prevent middle-click default behavior (auto-scroll)
+        wrapper.addEventListener('auxclick', (e) => {
+            if (e.button === 1) {
+                e.preventDefault();
+            }
+        });
+    });
 }
 
 /**

@@ -1466,6 +1466,20 @@
     color: #b45309;
 }
 
+/* ==================== Table Drag Scroll ==================== */
+.table-wrapper {
+    cursor: default;
+}
+
+.table-wrapper.dragging {
+    cursor: grabbing !important;
+    user-select: none;
+}
+
+.table-wrapper.dragging * {
+    pointer-events: none;
+}
+
 /* ==================== Photo Modal ==================== */
 .photo-carousel {
     display: flex;

@@ -6,8 +6,9 @@
 // Current user state
 let currentUser = null;
 
-// Check if running in demo mode (file:// protocol or localhost without proper setup)
+// Check if running in demo mode (file:// protocol, localhost, or 127.0.0.1)
 const isDemoMode = window.location.protocol === 'file:' ||
+    window.location.hostname === '127.0.0.1' ||
     (window.location.hostname === 'localhost' && !CONFIG.GOOGLE_CLIENT_ID.includes('.apps.googleusercontent.com'));
 
 /**
@@ -16,7 +17,7 @@ const isDemoMode = window.location.protocol === 'file:' ||
 function initGoogleAuth() {
     // If demo mode, setup demo login button instead
     if (isDemoMode) {
-        console.log('🎮 Demo mode enabled (file:// protocol detected)');
+        console.log('🎮 Demo mode enabled (local development detected)');
         setupDemoLogin();
         return;
     }
@@ -28,19 +29,39 @@ function initGoogleAuth() {
         return;
     }
 
-    google.accounts.id.initialize({
-        client_id: CONFIG.GOOGLE_CLIENT_ID,
-        callback: handleGoogleCallback,
-        auto_select: false,
-        cancel_on_tap_outside: true
-    });
-
-    // Also setup the custom button
-    const loginBtn = document.getElementById('googleLoginBtn');
-    if (loginBtn) {
-        loginBtn.addEventListener('click', () => {
-            google.accounts.id.prompt();
+    try {
+        google.accounts.id.initialize({
+            client_id: CONFIG.GOOGLE_CLIENT_ID,
+            callback: handleGoogleCallback,
+            auto_select: false,
+            cancel_on_tap_outside: true
         });
+
+        // Also setup the custom button
+        const loginBtn = document.getElementById('googleLoginBtn');
+        if (loginBtn) {
+            loginBtn.addEventListener('click', () => {
+                try {
+                    google.accounts.id.prompt((notification) => {
+                        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                            console.warn('Google prompt not displayed or skipped:', notification.getNotDisplayedReason?.() || notification.getSkippedReason?.());
+                            // Fallback to demo mode if Google fails
+                            showToast('warning', 'Google 登入暫時無法使用', '已切換為 Demo 模式');
+                            setupDemoLogin();
+                            handleDemoLogin();
+                        }
+                    });
+                } catch (e) {
+                    console.error('Google prompt error:', e);
+                    showToast('warning', 'Google 登入失敗', '使用 Demo 模式');
+                    handleDemoLogin();
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Google Auth initialization failed:', error);
+        // Fallback to demo mode
+        setupDemoLogin();
     }
 }
 
