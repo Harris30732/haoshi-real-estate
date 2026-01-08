@@ -5,7 +5,9 @@
 
 const CONFIG = {
     // API Configuration
-    API_BASE_URL: 'https://findmyhome.zeabur.app/webhook',
+    // Using Vercel proxy to bypass CORS - requests to /api/* are rewritten to n8n webhook
+    API_BASE_URL: '/api',
+    API_DIRECT_URL: 'https://findmyhome.zeabur.app/webhook', // Direct URL for reference
     API_TEST_URL: 'https://findmyhome.zeabur.app/webhook-test',
 
     // Use test or production API
